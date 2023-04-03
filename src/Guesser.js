@@ -10,17 +10,29 @@
 //     return OPERATOR_FUNCTIONS[opFuncs[opFuncIndex]];
 // }
 // TODO: Operation is inherited and becomes a 'species' - species with unworkable operations die out.
+let currentID = 0;
+function makeID() {
+    currentID++;
+    return currentID;
+}
 
 const MAX_EXPRESSION = 100;
 
-class Brain {
+class Guesser {
     //#influencability = 0; // TODO: Play with what happens if this is also a gene! Could be cool
 
-    constructor() {
-        this.genes = {
-            left: Math.round(Math.random() * MAX_EXPRESSION),
-            right: Math.round(Math.random() * MAX_EXPRESSION),
-        };
+    constructor(parent = null) {
+        this.id = makeID();
+        if (parent) {
+            this.genes = this.mutate(parent);
+            this.parentID = parent.id;
+        } else {
+            this.genes = {
+                left: Math.round(Math.random() * MAX_EXPRESSION),
+                right: Math.round(Math.random() * MAX_EXPRESSION),
+            };
+        }
+
         // this.#influencability = Math.round((Math.random() * 2 - 1) * 100) / 100; // gives random between (approximately) -0.99 and +0.99
     }
 
@@ -35,7 +47,8 @@ class Brain {
         }
 
         function getMultiplicator() {
-            return Math.random() / 5 - 0.1 + 1; // between 1.1 and 0.99
+            //return Math.random() / 5 - 0.1 + 1; // between (approximately) 1.1 and 0.99
+            return Math.random() / 3 - 1 / 6 + 1; // between (approximately) 1.3 and 0.7
         }
 
         const genes = {
@@ -43,7 +56,6 @@ class Brain {
             right: Math.round(parent.genes.right * getMultiplicator()),
         };
 
-        this.genes = genes;
         return genes;
     }
 }
@@ -51,15 +63,22 @@ class Brain {
 const MY_NUMBER = 53;
 // Pick parent: given list of eligible parents, pick one to inherit from, weighted by how 'correct' they were.
 let myParents = [
-    new Brain(),
-    new Brain(),
-    new Brain(),
-    new Brain(),
-    new Brain(),
-].map((brain) => {
+    new Guesser(),
+    new Guesser(),
+    new Guesser(),
+    new Guesser(),
+    new Guesser(),
+    new Guesser(),
+    new Guesser(),
+    new Guesser(),
+    new Guesser(),
+    new Guesser(),
+].map(mapParent);
+
+function mapParent(brain) {
     brain.distance = Math.abs(brain.genes.left + brain.genes.right - MY_NUMBER);
     return brain;
-});
+}
 
 function sortParents(parents) {
     parents = parents.sort((parentA, parentB) => {
@@ -71,13 +90,12 @@ sortParents(myParents);
 
 function pickParent(parents) {
     // parents are sorted by distance
-    // chance of selecting a parent is logarithmic
-    // first parent option: 50% chance of selecting as parent
-    // if that fails, move to second parent (25% chance), etc
+    // Coin flip at each parent on whether to select it
+    // loop around if run out of parents
     // once succeeds, kill the loop
     let parent;
     for (let i = 0; i < parents.length; i++) {
-        if (Math.random() < 1 / (2 * (i + 1))) {
+        if (Math.random() < 0.5) {
             parent = parents[i];
             break;
         }
@@ -89,14 +107,17 @@ function pickParent(parents) {
     return parent;
 }
 
-const brain = new Brain();
-console.log(brain);
-
-console.log(brain.mutate(pickParent(myParents)));
-myParents.push({
-    ...brain,
-    baby: true,
-    distance: Math.abs(brain.genes.left + brain.genes.right - MY_NUMBER),
-});
-sortParents(myParents);
-console.log("parents", myParents);
+for (let i = 0; i < 20; i++) {
+    const brain = new Guesser(pickParent(myParents));
+    brain.distance = Math.abs(brain.genes.left + brain.genes.right - MY_NUMBER);
+    myParents.push({ ...brain });
+    sortParents(myParents);
+    if (brain.distance == 0) {
+        break;
+    }
+    if (i == 19) {
+        i = 0;
+    }
+}
+console.log("myParents", myParents);
+console.log("tries: ", myParents.length);
