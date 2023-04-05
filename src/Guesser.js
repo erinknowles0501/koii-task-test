@@ -16,20 +16,24 @@ function makeID() {
     return currentID;
 }
 
-const MAX_EXPRESSION = 100;
+const { GUESSER_GENE_MAX } = require("../init");
 
 class Guesser {
     //#influencability = 0; // TODO: Play with what happens if this is also a gene! Could be cool
 
     constructor(parent = null) {
+        console.log("parent in guesser", parent);
+
         this.id = makeID();
         if (parent) {
+            console.log("parent is: ", parent);
+
             this.genes = this.mutate(parent);
             this.parentID = parent.id;
         } else {
             this.genes = {
-                left: Math.round(Math.random() * MAX_EXPRESSION),
-                right: Math.round(Math.random() * MAX_EXPRESSION),
+                left: Math.round(Math.random() * GUESSER_GENE_MAX),
+                right: Math.round(Math.random() * GUESSER_GENE_MAX),
             };
         }
 
@@ -60,64 +64,4 @@ class Guesser {
     }
 }
 
-const MY_NUMBER = 53;
-// Pick parent: given list of eligible parents, pick one to inherit from, weighted by how 'correct' they were.
-let myParents = [
-    new Guesser(),
-    new Guesser(),
-    new Guesser(),
-    new Guesser(),
-    new Guesser(),
-    new Guesser(),
-    new Guesser(),
-    new Guesser(),
-    new Guesser(),
-    new Guesser(),
-].map(mapParent);
-
-function mapParent(brain) {
-    brain.distance = Math.abs(brain.genes.left + brain.genes.right - MY_NUMBER);
-    return brain;
-}
-
-function sortParents(parents) {
-    parents = parents.sort((parentA, parentB) => {
-        return parentA.distance > parentB.distance ? 1 : -1;
-    });
-    return parents;
-}
-sortParents(myParents);
-
-function pickParent(parents) {
-    // parents are sorted by distance
-    // Coin flip at each parent on whether to select it
-    // loop around if run out of parents
-    // once succeeds, kill the loop
-    let parent;
-    for (let i = 0; i < parents.length; i++) {
-        if (Math.random() < 0.5) {
-            parent = parents[i];
-            break;
-        }
-        if (i + 1 == parents.length) {
-            i = 0;
-        }
-    }
-
-    return parent;
-}
-
-for (let i = 0; i < 20; i++) {
-    const brain = new Guesser(pickParent(myParents));
-    brain.distance = Math.abs(brain.genes.left + brain.genes.right - MY_NUMBER);
-    myParents.push({ ...brain });
-    sortParents(myParents);
-    if (brain.distance == 0) {
-        break;
-    }
-    if (i == 19) {
-        i = 0;
-    }
-}
-console.log("myParents", myParents);
-console.log("tries: ", myParents.length);
+module.exports = Guesser;

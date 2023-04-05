@@ -1,57 +1,39 @@
 const { namespaceWrapper } = require("./namespaceWrapper");
-const crypto = require("crypto");
-const { Brain } = require("./src/Brain.js");
+const Guesser = require("./src/Guesser.js");
+const { pickParent } = require("./src/helpers.js");
 
 class CoreLogic {
     async task() {
         // Write the logic to do the work required for submitting the values and optionally store the result in levelDB
 
-        const brain = new Brain();
-
         try {
-            const prevResults = namespaceWrapper.storeGet("prevResults");
+            const parents = JSON.parse(
+                await namespaceWrapper.storeGet("parents")
+            );
+            console.log("parents in task()", parents, typeof parents);
 
-            if (prevResults) {
-                console.log("prevResults", prevResults);
-                brain.mutate(prevResults);
-            }
+            const guesser = new Guesser(parents && pickParent(parents));
+            console.log("guesser in task", guesser);
 
-            const x = "Hello, " + Math.random().toString(); // generate random number and convert to string
-            //const cid = crypto.createHash("sha1").update(x).digest("hex"); // convert to CID
-            //console.log("HASH:", cid);
-
-            // fetching round number to store work accordingly
-
-            if (x) {
-                await namespaceWrapper.storeSet("cid", x); // store CID in levelDB
-            }
+            await namespaceWrapper.storeSet("guesser", JSON.stringify(guesser));
         } catch (err) {
             console.log("ERROR IN EXECUTING TASK", err);
         }
     }
     async fetchSubmission() {
-        // Write the logic to fetch the submission values here and return the cid string
-
-        // fetching round number to store work accordingly
-
-        console.log("IN FETCH SUBMISSION");
-
+        // console.log("IN FETCH SUBMISSION");
         const round = await namespaceWrapper.getRound();
-        // The code below shows how you can fetch your stored value from level DB
+        console.log("round in fetch submission", round);
 
-        const cid = await namespaceWrapper.storeGet("cid"); // retrieves the cid
-        console.log("CID", cid);
-        return cid;
+        const guesser = await namespaceWrapper.storeGet("guesser");
+        console.log("guesser in fetchSubmittion", guesser);
+
+        return guesser;
     }
 
     async generateDistributionList(round) {
         try {
             console.log("GenerateDistributionList called");
-            console.log("I am selected node");
-
-            // Write the logic to generate the distribution list here by introducing the rules of your choice
-
-            /*  **** SAMPLE LOGIC FOR GENERATING DISTRIBUTION LIST ******/
 
             let distributionList = {};
             const taskAccountDataJSON = await namespaceWrapper.getTaskState();
@@ -90,6 +72,35 @@ class CoreLogic {
                         }
                         if (numOfVotes < 0) continue;
                     }
+
+                    // BEGIN GET AND SET PARENTS
+                    const storeParents = JSON.parse(
+                        await namespaceWrapper.storeGet("parents")
+                    );
+                    console.log("storeParents", storeParents);
+
+                    const parents = storeParents ?? [];
+                    console.log("parents in validateNode before", parents);
+
+                    const submittedGuesser = values[i].submission_value;
+                    console.log(
+                        "submittedGuesser",
+                        submittedGuesser,
+                        typeof submittedGuesser
+                    );
+
+                    parents.push(JSON.parse(submittedGuesser));
+                    await namespaceWrapper.storeSet(
+                        "parents",
+                        JSON.stringify(parents)
+                    );
+
+                    const parentsAfter = JSON.parse(
+                        await namespaceWrapper.storeGet("parents")
+                    );
+                    console.log("parentsAfter", parentsAfter);
+                    // END GET AND SET PARENTS
+
                     distributionList[candidatePublicKey] = 1;
                 }
             }
@@ -126,31 +137,26 @@ class CoreLogic {
         }
     }
 
-    async validateNode(submission_value, round) {
-        // Write your logic for the validation of submission value here and return a boolean value in response
+    async validateNode(submissionValue, round) {
+        console.log("Received submission_value", submissionValue, round);
 
-        // The sample logic can be something like mentioned below to validate the submission
+        try {
+            const guesser = JSON.parse(await this.fetchSubmission());
+            //console.log("guesser in validate node", guesser);
 
-        // try{
+            const shallowEquals = this.shallowEqual(guesser, submissionValue);
 
-        console.log("Received submission_value", submission_value, round);
-        // const generatedValue = await namespaceWrapper.storeGet("cid");
-        // console.log("GENERATED VALUE", generatedValue);
-        // if(generatedValue == submission_value){
-        //   return true;
-        // }else{
-        //   return false;
-        // }
-        // }catch(err){
-        //   console.log("ERROR  IN VALDIATION", err);
-        //   return false;
-        // }
+            if (shallowEquals) {
+                return true;
+            }
+        } catch (error) {
+            console.error("Node validation error: ", error);
+        }
 
-        // For succesfull flow we return true for now
-        return true;
+        return false;
     }
 
-    async shallowEqual(object1, object2) {
+    shallowEqual(object1, object2) {
         const keys1 = Object.keys(object1);
         const keys2 = Object.keys(object2);
         if (keys1.length !== keys2.length) {
@@ -165,9 +171,6 @@ class CoreLogic {
     }
 
     validateDistribution = async (distributionListSubmitter, round) => {
-        // Write your logic for the validation of submission value here and return a boolean value in response
-        // this logic can be same as generation of distribution list function and based on the comparision will final object , decision can be made
-
         try {
             console.log(
                 "Distribution list Submitter",
@@ -186,10 +189,8 @@ class CoreLogic {
             // compare distribution list
 
             const parsed = JSON.parse(fetchedDistributionList);
-            const result = await this.shallowEqual(
-                parsed,
-                generateDistributionList
-            );
+            const result = this.shallowEqual(parsed, generateDistributionList);
+
             console.log("RESULT", result);
             return result;
         } catch (err) {
@@ -198,32 +199,24 @@ class CoreLogic {
         }
     };
     // Submit Address with distributioon list to K2
-    async submitTask(roundNumber) {
-        console.log("submitTask called with round", roundNumber);
+    async submitTask(round) {
+        //.log("submitTask called with round", round);
         try {
-            console.log("inside try");
-            console.log(
-                await namespaceWrapper.getSlot(),
-                "current slot while calling submit"
-            );
             const submission = await this.fetchSubmission();
-            console.log("SUBMISSION", submission);
+            console.log("submission in submitTask", submission);
+
+            //const submission = "8f6e73af6e51bca500e39cc3b850a52a57cf41aa";
             await namespaceWrapper.checkSubmissionAndUpdateRound(
                 submission,
-                roundNumber
+                round
             );
-            console.log("after the submission call");
         } catch (error) {
             console.log("error in submission", error);
         }
     }
 
     async auditTask(roundNumber) {
-        console.log("auditTask called with round", roundNumber);
-        console.log(
-            await namespaceWrapper.getSlot(),
-            "current slot while calling auditTask"
-        );
+        // console.log("auditTask called with round", roundNumber);
         await namespaceWrapper.validateAndVoteOnNodes(
             this.validateNode,
             roundNumber
