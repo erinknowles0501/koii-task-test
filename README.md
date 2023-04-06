@@ -10,7 +10,9 @@ Before each round is executed, a check is made to see if that guesser exists. If
 
 ## Editing the parameters
 
-The target number, maximum mutation percentage, and maximum gene value are all defined in `/src/constants`.
+The number of parents to start with, target number, maximum mutation percentage, and maximum gene value are all defined in `/src/constants`.
+
+Generally, you'll want more starting parents and low-ish max mutation percentage - otherwise, they'll quickly get to the general area of your target number, but then skip around for a long time.
 
 ## Testing
 
@@ -18,6 +20,6 @@ A test for the Guesser is defined in `/tests/Guesser.test.js`. A script to run a
 
 ## Simulation
 
-You can _simulate_ the process of generating Guessers across nodes and rounds by running `/simulate/index.js` (a script for this is included in `package.json`.)
+You can _simulate_ the process of generating Guessers by running `/simulate/index.js` (a script for this is included in `package.json`.)
 
 Note that this does not necessarily duplicate the logic included in `coreLogic.js`! It was written to assist with making sure the Guessers would eventually guess correctly, given the task's parameters, and also because it's fun to watch.

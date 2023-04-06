@@ -1,5 +1,6 @@
 const { namespaceWrapper } = require("./namespaceWrapper");
 const Guesser = require("./src/Guesser.js");
+const { STARTNG_PARENTS } = require("./src/constants.js");
 
 class CoreLogic {
     async checkForCorrectGuess() {
@@ -15,9 +16,9 @@ class CoreLogic {
 
     async task() {
         try {
-            const parents = JSON.parse(
-                await namespaceWrapper.storeGet("parents")
-            ) || [new Guesser(), new Guesser(), new Guesser()]; // Give it a few to pick from for the beginning rounds, otherwise, since there's only one node operating, it may take a long time to converge on an answer, depending on your MAX_MUTATION_PERCENTAGE.
+            const parents =
+                JSON.parse(await namespaceWrapper.storeGet("parents")) ||
+                new Array(STARTNG_PARENTS).fill().map(() => new Guesser()); // Give it a few to pick from for the beginning rounds, otherwise, since there's only one node operating, it may take a long time to converge on an answer, depending on your MAX_MUTATION_PERCENTAGE.
             console.log("parents in task", parents);
 
             const guesser = new Guesser(parents && Guesser.pickParent(parents));
@@ -61,6 +62,8 @@ class CoreLogic {
                     values,
                     size
                 );
+
+                const newParents = [];
                 for (let i = 0; i < size; i++) {
                     const candidatePublicKey = keys[i];
                     if (
@@ -81,14 +84,9 @@ class CoreLogic {
                         if (numOfVotes < 0) continue;
                     }
 
-                    const storeParents = JSON.parse(
-                        await namespaceWrapper.storeGet("parents")
-                    );
-                    const parents = storeParents ?? [];
                     const submittedGuesser = JSON.parse(
                         values[i].submission_value
                     );
-
                     if (submittedGuesser.distance === 0) {
                         console.log(
                             "Correct guess has been made!",
@@ -99,16 +97,41 @@ class CoreLogic {
                             JSON.stringify(submittedGuesser)
                         );
                     }
-
-                    parents.push(submittedGuesser);
-
-                    await namespaceWrapper.storeSet(
-                        "parents",
-                        JSON.stringify(parents)
-                    );
+                    newParents.push(submittedGuesser);
 
                     distributionList[candidatePublicKey] = 1;
                 }
+
+                const storeParents = JSON.parse(
+                    await namespaceWrapper.storeGet("parents")
+                );
+                console.log("storeParents", storeParents);
+
+                let parents = storeParents ?? [];
+
+                parents.push(...newParents);
+                console.log("parents - pushed", parents);
+
+                parents = Guesser.sortParents(parents);
+                console.log("parents - set", parents);
+
+                const successfulSubmissions =
+                    Object.keys(distributionList).length;
+
+                if (parents.length > successfulSubmissions) {
+                    parents = parents.slice(
+                        0,
+                        parents.length -
+                            Object.keys(distributionList).length -
+                            1
+                    ); // remove the n worst parents, where n is the number of new successful submissions.
+                    console.log("parents - sliced", parents);
+                }
+
+                await namespaceWrapper.storeSet(
+                    "parents",
+                    JSON.stringify(parents)
+                );
             }
             console.log("Distribution List", distributionList);
             return distributionList;

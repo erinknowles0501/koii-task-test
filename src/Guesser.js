@@ -16,6 +16,7 @@ const {
     GUESSER_GENE_MAX,
     MAX_MUTATION_PERCENTAGE,
     GUESSER_TARGET_NUMBER,
+    PARENT_PICK_PERCENTAGE,
 } = require("./constants");
 
 class Guesser {
@@ -63,17 +64,22 @@ class Guesser {
         return genes;
     }
 
+    static sortParents(parents) {
+        return parents.sort((parentA, parentB) => {
+            return parentA.distance > parentB.distance ? 1 : -1;
+        });
+    }
+
     static pickParent(parents) {
         // parents are sorted by distance
         // Coin flip at each parent on whether to select it
         // loop around if run out of parents
 
-        parents = parents.sort((parentA, parentB) => {
-            return parentA.distance > parentB.distance ? 1 : -1;
-        });
+        parents = this.sortParents(parents);
+        console.log("parents sorted", parents);
 
         for (let i = 0; i < parents.length; i++) {
-            if (Math.random() < 0.5) {
+            if (Math.random() < PARENT_PICK_PERCENTAGE / 100) {
                 return parents[i];
             }
             if (i + 1 == parents.length) {
