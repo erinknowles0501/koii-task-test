@@ -10,24 +10,20 @@
 //     return OPERATOR_FUNCTIONS[opFuncs[opFuncIndex]];
 // }
 // TODO: Operation is inherited and becomes a 'species' - species with unworkable operations die out.
-let currentID = 0;
-function makeID() {
-    currentID++;
-    return currentID;
-}
 
-const { GUESSER_GENE_MAX } = require("../init");
+const { makeID } = require("./helpers.js");
+const {
+    GUESSER_GENE_MAX,
+    MAX_MUTATION_PERCENTAGE,
+    GUESSER_TARGET_NUMBER,
+} = require("./constants");
 
 class Guesser {
     //#influencability = 0; // TODO: Play with what happens if this is also a gene! Could be cool
 
     constructor(parent = null) {
-        console.log("parent in guesser", parent);
-
         this.id = makeID();
         if (parent) {
-            console.log("parent is: ", parent);
-
             this.genes = this.mutate(parent);
             this.parentID = parent.id;
         } else {
@@ -36,8 +32,9 @@ class Guesser {
                 right: Math.round(Math.random() * GUESSER_GENE_MAX),
             };
         }
-
-        // this.#influencability = Math.round((Math.random() * 2 - 1) * 100) / 100; // gives random between (approximately) -0.99 and +0.99
+        this.distance = Math.abs(
+            this.genes.left + this.genes.right - GUESSER_TARGET_NUMBER
+        );
     }
 
     mutate(parent) {
@@ -51,8 +48,11 @@ class Guesser {
         }
 
         function getMultiplicator() {
-            //return Math.random() / 5 - 0.1 + 1; // between (approximately) 1.1 and 0.99
-            return Math.random() / 3 - 1 / 6 + 1; // between (approximately) 1.3 and 0.7
+            // This function returns a number that is off from 1 by a random amount within the range specified by MAX_MUTATION_PERCENTAGE.
+            const decimalPercent = MAX_MUTATION_PERCENTAGE / 100;
+            const mutatedRandom = Math.random() * decimalPercent; //  Assuming MAX_MUTATION_PERCENTAGE is 20, this returns something between 0 and 0.2
+            const adjustedMutatedRandom = 1 + mutatedRandom - decimalPercent; // This would return a random number between 0.8 and 1.2 - each 0.2 (20 percent) off from 1
+            return adjustedMutatedRandom;
         }
 
         const genes = {
@@ -61,6 +61,25 @@ class Guesser {
         };
 
         return genes;
+    }
+
+    static pickParent(parents) {
+        // parents are sorted by distance
+        // Coin flip at each parent on whether to select it
+        // loop around if run out of parents
+
+        parents = parents.sort((parentA, parentB) => {
+            return parentA.distance > parentB.distance ? 1 : -1;
+        });
+
+        for (let i = 0; i < parents.length; i++) {
+            if (Math.random() < 0.5) {
+                return parents[i];
+            }
+            if (i + 1 == parents.length) {
+                i = 0;
+            }
+        }
     }
 }
 

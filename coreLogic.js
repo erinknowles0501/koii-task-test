@@ -1,18 +1,26 @@
 const { namespaceWrapper } = require("./namespaceWrapper");
 const Guesser = require("./src/Guesser.js");
-const { pickParent } = require("./src/helpers.js");
 
 class CoreLogic {
-    async task() {
-        // Write the logic to do the work required for submitting the values and optionally store the result in levelDB
+    async checkForCorrectGuess() {
+        try {
+            const correctGuess = JSON.parse(
+                await namespaceWrapper.storeGet("correctGuess")
+            );
+            return correctGuess;
+        } catch (error) {
+            console.error("ERROR IN checkForCorrectGuess: ", error);
+        }
+    }
 
+    async task() {
         try {
             const parents = JSON.parse(
                 await namespaceWrapper.storeGet("parents")
-            );
-            console.log("parents in task()", parents, typeof parents);
+            ) || [new Guesser(), new Guesser(), new Guesser()]; // Give it a few to pick from for the beginning rounds, otherwise, since there's only one node operating, it may take a long time to converge on an answer, depending on your MAX_MUTATION_PERCENTAGE.
+            console.log("parents in task", parents);
 
-            const guesser = new Guesser(parents && pickParent(parents));
+            const guesser = new Guesser(parents && Guesser.pickParent(parents));
             console.log("guesser in task", guesser);
 
             await namespaceWrapper.storeSet("guesser", JSON.stringify(guesser));
@@ -73,33 +81,31 @@ class CoreLogic {
                         if (numOfVotes < 0) continue;
                     }
 
-                    // BEGIN GET AND SET PARENTS
                     const storeParents = JSON.parse(
                         await namespaceWrapper.storeGet("parents")
                     );
-                    console.log("storeParents", storeParents);
-
                     const parents = storeParents ?? [];
-                    console.log("parents in validateNode before", parents);
-
-                    const submittedGuesser = values[i].submission_value;
-                    console.log(
-                        "submittedGuesser",
-                        submittedGuesser,
-                        typeof submittedGuesser
+                    const submittedGuesser = JSON.parse(
+                        values[i].submission_value
                     );
 
-                    parents.push(JSON.parse(submittedGuesser));
+                    if (submittedGuesser.distance === 0) {
+                        console.log(
+                            "Correct guess has been made!",
+                            submittedGuesser
+                        );
+                        await namespaceWrapper.storeSet(
+                            "correctGuess",
+                            JSON.stringify(submittedGuesser)
+                        );
+                    }
+
+                    parents.push(submittedGuesser);
+
                     await namespaceWrapper.storeSet(
                         "parents",
                         JSON.stringify(parents)
                     );
-
-                    const parentsAfter = JSON.parse(
-                        await namespaceWrapper.storeGet("parents")
-                    );
-                    console.log("parentsAfter", parentsAfter);
-                    // END GET AND SET PARENTS
 
                     distributionList[candidatePublicKey] = 1;
                 }
@@ -142,10 +148,7 @@ class CoreLogic {
 
         try {
             const guesser = JSON.parse(await this.fetchSubmission());
-            //console.log("guesser in validate node", guesser);
-
             const shallowEquals = this.shallowEqual(guesser, submissionValue);
-
             if (shallowEquals) {
                 return true;
             }
@@ -205,7 +208,6 @@ class CoreLogic {
             const submission = await this.fetchSubmission();
             console.log("submission in submitTask", submission);
 
-            //const submission = "8f6e73af6e51bca500e39cc3b850a52a57cf41aa";
             await namespaceWrapper.checkSubmissionAndUpdateRound(
                 submission,
                 round
