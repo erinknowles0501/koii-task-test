@@ -1,16 +1,3 @@
-// const OPERATOR_FUNCTIONS = {
-//     add: (a, b) => a + b,
-//     subtract: (a, b) => a - b,
-//     multiply: (a, b) => a * b,
-//     divide: (a, b) => a / b,
-// };
-// #getOperation() {
-//     const opFuncs = Object.keys(OPERATOR_FUNCTIONS);
-//     const opFuncIndex = Math.floor(Math.random() * opFuncs.length);
-//     return OPERATOR_FUNCTIONS[opFuncs[opFuncIndex]];
-// }
-// TODO: Operation is inherited and becomes a 'species' - species with unworkable operations die out.
-
 const { makeID } = require("./helpers.js");
 const {
     GUESSER_GENE_MAX,
@@ -20,8 +7,6 @@ const {
 } = require("./constants");
 
 class Guesser {
-    //#influencability = 0; // TODO: Play with what happens if this is also a gene! Could be cool
-
     constructor(parent = null) {
         this.id = makeID();
         if (parent) {
@@ -48,17 +33,17 @@ class Guesser {
             throw new Error("Bad parent: " + parent);
         }
 
-        function getMultiplicator() {
-            // This function returns a number that is off from 1 by a random amount within the range specified by MAX_MUTATION_PERCENTAGE.
-            const decimalPercent = MAX_MUTATION_PERCENTAGE / 100;
-            const mutatedRandom = Math.random() * decimalPercent; //  Assuming MAX_MUTATION_PERCENTAGE is 20, this returns something between 0 and 0.2
-            const adjustedMutatedRandom = 1 + mutatedRandom - decimalPercent; // This would return a random number between 0.8 and 1.2 - each 0.2 (20 percent) off from 1
-            return adjustedMutatedRandom;
+        function getMutation(gene) {
+            // Computes a maximum and minimum gene value based on the max mutation percentage
+            const max = Math.floor(gene * (1 + MAX_MUTATION_PERCENTAGE / 100));
+            const min = Math.ceil(gene * (1 - MAX_MUTATION_PERCENTAGE / 100));
+            const range = (max - min + 1);
+            return Math.floor(Math.random() * range) + min; // Get random number in that range, bump it up to at least the minimum value, and clamp it so it doesn't exceed the max
         }
 
         const genes = {
-            left: Math.round(parent.genes.left * getMultiplicator()),
-            right: Math.round(parent.genes.right * getMultiplicator()),
+            left: getMutation(parent.genes.left),
+            right: getMutation(parent.genes.right),
         };
 
         return genes;
@@ -76,7 +61,6 @@ class Guesser {
         // loop around if run out of parents
 
         parents = this.sortParents(parents);
-        console.log("parents sorted", parents);
 
         for (let i = 0; i < parents.length; i++) {
             if (Math.random() < PARENT_PICK_PERCENTAGE / 100) {

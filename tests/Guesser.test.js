@@ -12,30 +12,17 @@ test("Guesser created from parent mutates inherited genes within MAX_MUTATION_PE
     const parent = new Guesser();
     const guesser = new Guesser(parent);
 
-    const leftMutationDistance = Math.abs(
-        guesser.genes.left - parent.genes.left
-    );
-    const leftGeneAverageValue = (guesser.genes.left + parent.genes.left) / 2;
-    const leftMutationPercentage =
-        (leftMutationDistance / leftGeneAverageValue) * 100;
+    function getInRange(parentGene, guesserGene) {
+        const max = parentGene * (1 + MAX_MUTATION_PERCENTAGE / 100);
+        const min = parentGene * (1 - MAX_MUTATION_PERCENTAGE / 100);
+        return max >= guesserGene && guesserGene >= min;
+    }
 
-    const rightMutationDistance = Math.abs(
-        guesser.genes.right - parent.genes.right
-    );
-    const rightGeneAverageValue =
-        (guesser.genes.right + parent.genes.right) / 2;
-    const rightMutationPercentage =
-        (rightMutationDistance / rightGeneAverageValue) * 100;
+    const leftIsInRange = getInRange(parent.genes.left, guesser.genes.left);
+    const rightIsInRange = getInRange(parent.genes.right, guesser.genes.right);
 
-    console.log(
-        "leftMutationPercentage, rightMutationPercentage",
-        leftMutationPercentage,
-        rightMutationPercentage,
-        MAX_MUTATION_PERCENTAGE
-    );
-
-    assert(leftMutationPercentage <= MAX_MUTATION_PERCENTAGE);
-    assert(rightMutationPercentage <= MAX_MUTATION_PERCENTAGE);
+    assert(leftIsInRange);
+    assert(rightIsInRange);
 });
 
 test("Guesser saves the id of its parent", () => {
